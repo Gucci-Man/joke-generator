@@ -1,41 +1,19 @@
-import React, { Component } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Joke from "./Joke";
 import "./JokeList.css";
 
-/** List of jokes. */
+function JokeList({ numJokesToGet = 5 }) {
+  const [jokes, setJokes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-class JokeList extends Component {
-  static defaultProps = {
-    numJokesToGet: 5
-  };
-
-  constructor(props) {
-    super(props);
-    this.state = {
-      jokes: [],
-      isLoading: true
-    };
-
-    this.generateNewJokes = this.generateNewJokes.bind(this);
-    this.vote = this.vote.bind(this);
-  }
-
-  /* at mount, get jokes */
-
-  componentDidMount() {
-    this.getJokes();
-  }
-
-  /* retrieve jokes from API */
-
-  async getJokes() {
+  // Fetch jokes from the api
+  async function getJokes() {
     try {
-      // load jokes one at a time, adding not-yet-seen jokes
       let jokes = [];
       let seenJokes = new Set();
 
-      while (jokes.length < this.props.numJokesToGet) {
+      while (jokes.length < numJokesToGet) {
         let res = await axios.get("https://icanhazdadjoke.com", {
           headers: { Accept: "application/json" }
         });
@@ -49,62 +27,59 @@ class JokeList extends Component {
         }
       }
 
-      this.setState({ jokes, isLoading: false });
+      setJokes(jokes);
+      setIsLoading(false);
     } catch (err) {
       console.error(err);
+      // Handle the error (e.g., display a message to the user)
     }
   }
 
-  /* empty joke list, set to loading state, and then call getJokes */
+  // useEffect for fetching jokes on mount
+  useEffect(() => {
+    
+    getJokes();
+  }, [numJokesToGet]); // Run useEffect on mount and if numJokesToGet changes
 
-  generateNewJokes() {
-    this.setState({ isLoading: true});
-    this.getJokes();
-  }
+  // Method to fetch new jokes
+  const generateNewJokes = () => {
+    setIsLoading(true);
+    getJokes(); // Reuse the existing getJokes function
+  };
 
-  /* change vote for this id by delta (+1 or -1) */
+  // Method to handle voting
+  const vote = (id, delta) => {
+    setJokes(allJokes =>
+      allJokes.map(j => (j.id === id ? { ...j, votes: j.votes + delta } : j))
+    );
+  };
 
-  vote(id, delta) {
-    this.setState(st => ({
-      jokes: st.jokes.map(j =>
-        j.id === id ? { ...j, votes: j.votes + delta } : j
-      )
-    }));
-  }
+  // Sort jokes by votes
+  const sortedJokes = jokes.sort((a, b) => b.votes - a.votes);
 
-  /* render: either loading spinner or list of sorted jokes. */
+  return (
+    <div className="JokeList">
+      <button className="JokeList-getmore" onClick={generateNewJokes}>
+        Get New Jokes
+      </button>
 
-  render() {
-    let sortedJokes = [...this.state.jokes].sort((a, b) => b.votes - a.votes);
-    if (this.state.isLoading) {
-      return (
+      {isLoading ? (
         <div className="loading">
           <i className="fas fa-4x fa-spinner fa-spin" />
         </div>
-      )
-    }
-
-    return (
-      <div className="JokeList">
-        <button
-          className="JokeList-getmore"
-          onClick={this.generateNewJokes}
-        >
-          Get New Jokes
-        </button>
-
-        {sortedJokes.map(j => (
+      ) : (
+        sortedJokes.map(j => (
           <Joke
-            text={j.joke}
             key={j.id}
             id={j.id}
             votes={j.votes}
-            vote={this.vote}
+            text={j.joke}
+            vote={vote}
           />
-        ))}
-      </div>
-    );
-  }
+        ))
+      )}
+    </div>
+  );
 }
 
 export default JokeList;
